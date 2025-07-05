@@ -20,8 +20,8 @@ namespace ControlAccesos.WebApi.Models
 
         public DateTime? FechaValidez { get; set; } // Nullable para invitaciones sin fecha específica
 
-        [StringLength(128)]
-        public string QrJti { get; set; } // Json Token Id del JWT del QR, debe ser único
+        [StringLength(10)] 
+        public string QrCode { get; set; } // Campo para el código corto
 
         public int ResidenteId { get; set; } // Clave foránea al residente que lo invita
 

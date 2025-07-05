@@ -17,8 +17,7 @@ namespace ControlAccesos.WebApi.Data
         public DbSet<Guardia> Guardias { get; set; }
         public DbSet<Invitado> Invitados { get; set; }
         public DbSet<RegistroAcceso> RegistrosAcceso { get; set; }
-        public DbSet<TokensRevocados> TokensRevocados { get; set; }
-
+        
 
         // Se configura el mapeo de los modelos a la BD
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -42,9 +41,8 @@ namespace ControlAccesos.WebApi.Data
             modelBuilder.Entity<Usuario>()
                 .HasIndex(u => u.Username)
                 .IsUnique();
-
-            modelBuilder.Entity<Invitado>()
-                .HasIndex(i => i.QrJti)
+            modelBuilder.Entity<Invitado>() // Índice único para QrCode
+                .HasIndex(i => i.QrCode)
                 .IsUnique();
         }
 
