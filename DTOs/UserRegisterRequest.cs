@@ -2,7 +2,7 @@
 
 namespace ControlAccesos.WebApi.DTOs
 {
-    public class RegisterRequest : IValidatableObject
+    public class UserRegisterRequest : IValidatableObject
     {
         // --- Información del Usuario (para la tabla Usuarios) ---
         [Required(ErrorMessage = "El nombre de usuario es requerido.")]

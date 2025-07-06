@@ -61,6 +61,12 @@ namespace ControlAccesos.WebApi.Controllers
                 return BadRequest("El usuario autenticado no está asociado a un residente válido.");
             }
 
+            if (request.TipoInvitacion != "Unica" && request.TipoInvitacion != "Recurrente" && request.TipoInvitacion != "PorFecha")
+            {
+                return BadRequest("El tipo de invitación no es válido. Los valores permitidos son 'Unica', 'Recurrente' o 'PorFecha'.");
+            }
+
+
             int actualResidenteId = residente.Id;    
 
             try
@@ -157,5 +163,60 @@ namespace ControlAccesos.WebApi.Controllers
                 return StatusCode(500, $"Ocurrió un error al validar el código QR: {ex.Message}");
             }
         }
+
+
+        [HttpGet("my-invitations")]
+        [Authorize(Roles = "Residente")]
+        public async Task<IActionResult> GetMyInvitations()
+        {
+            // Obtener el UserId del usuario autenticado desde el JWT
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized("No se pudo identificar al usuario Residente autenticado.");
+            }
+
+            // Buscar el ResidenteId asociado al UserId autenticado
+            var residente = await _context.Residentes.FirstOrDefaultAsync(r => r.UserId == userId);
+            if (residente == null)
+            {
+                return BadRequest("El usuario autenticado no está asociado a un residente válido.");
+            }
+
+            try
+            {
+                var invitados = await _context.Invitados
+                                              .Where(i => i.ResidenteId == residente.Id)
+                                              .ToListAsync();
+
+                if (!invitados.Any())
+                {
+                    return NotFound("No se encontraron invitaciones registradas por este residente.");
+                }
+
+                var response = invitados.Select(i => new InvitadoResponse
+                {
+                    Id = i.Id,
+                    Nombre = i.Nombre,
+                    Apellidos = i.Apellidos,
+                    TipoInvitacion = i.TipoInvitacion,
+                    FechaValidez = i.FechaValidez,
+                    QrCode = i.QrCode,
+                    ResidenteId = i.ResidenteId
+                }).ToList();
+
+                return Ok(response);
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error al obtener las invitaciones de la base de datos: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al obtener las invitaciones: {ex.Message}");
+            }
+        }
+
     }
 }
