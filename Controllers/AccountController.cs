@@ -136,6 +136,16 @@ namespace ControlAccesos.WebApi.Controllers
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()) // ID único del JWT para revocación
             };
 
+            int? residenteId = null;
+            if (user.Rol == "Residente")
+            {
+                var residente = await _context.Residentes.FirstOrDefaultAsync(r => r.UserId == user.Id);
+                if (residente != null)
+                {
+                    residenteId = residente.Id;
+                }
+            }
+
             var jwtKey = _configuration["Jwt:Key"];
             var issuer = _configuration["Jwt:Issuer"];
             var audience = _configuration["Jwt:Audience"];
@@ -155,7 +165,8 @@ namespace ControlAccesos.WebApi.Controllers
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
                 Username = user.Username,
-                Rol = user.Rol
+                Rol = user.Rol,
+                ResidenteId =  residenteId
             });
         }
     }
