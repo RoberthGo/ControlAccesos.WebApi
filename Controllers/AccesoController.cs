@@ -65,31 +65,37 @@ namespace ControlAccesos.WebApi.Controllers
 
                 if (invitado != null)
                 {
-                    invitadoId = invitado.Id;
-                    nombrePersona = invitado.Nombre;
-                    apellidosPersona = invitado.Apellidos;
-                    rolPersona = "Invitado";
-                    identificadorUsado = request.InvitadoQrCode;
-
-                    // Validar la fecha de validez del invitado
-                    if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value < DateTime.Now)
-                    {
-                        return BadRequest("Acceso denegado: El permiso del invitado ha expirado.");
-                    }
-
-                    // Validar tipo de invitación "Unica"
-                    var hasEntered = await _context.RegistrosAcceso
-                                                   .AnyAsync(ra => ra.InvitadoId == invitado.Id && ra.TipoAcceso == "Entrada");
-
-                    if (invitado.TipoInvitacion == "Unica" && hasEntered)
-                    {
-                        return BadRequest("Acceso denegado: Este código de invitado único ya ha sido utilizado para una entrada.");
-                    }
-                }
-                else
-                {
                     return NotFound("Código QR de invitado inválido o no encontrado.");
                 }
+               
+                DateTime canceladoSentinel = DateTime.MinValue; // 0001-01-01T00:00:00
+
+                // 1.1. Verificar si está cancelado (tiene la fecha sentinel)
+                if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value == canceladoSentinel)
+                {
+                    return BadRequest("Acceso denegado: Este código QR ha sido cancelado por el residente.");
+                }
+
+                // Validar la fecha de validez del invitado
+                if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value < DateTime.Now)
+                {
+                    return BadRequest("Acceso denegado: El permiso del invitado ha expirado.");
+                }
+
+                // Validar tipo de invitación "Unica"
+                var hasEntered = await _context.RegistrosAcceso
+                                                .AnyAsync(ra => ra.InvitadoId == invitado.Id && ra.TipoAcceso == "Entrada");
+
+                if (invitado.TipoInvitacion == "Unica" && hasEntered)
+                {
+                    return BadRequest("Acceso denegado: Este código de invitado único ya ha sido utilizado para una entrada.");
+                }
+
+                invitadoId = invitado.Id;
+                nombrePersona = invitado.Nombre;
+                apellidosPersona = invitado.Apellidos;
+                rolPersona = "Invitado";
+                identificadorUsado = request.InvitadoQrCode;
             }
             else if (!string.IsNullOrWhiteSpace(request.ResidentUsername))
             {

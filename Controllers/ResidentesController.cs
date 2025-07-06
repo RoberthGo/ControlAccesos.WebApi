@@ -20,18 +20,39 @@ namespace ControlAccesos.WebApi.Controllers
             _context = context;
         }
 
-        [HttpGet("getALL")]
-        public async Task<IActionResult> GetAllResidents()
+
+
+        // GET: api/Residentes/getAllBy
+        [HttpGet("getAllBy")]
+        public async Task<IActionResult> GetAllBy( 
+            [FromQuery] string? nombre = null,
+            [FromQuery] string? apellidos = null,
+            [FromQuery] string? domicilio = null)
         {
             try
             {
-                var residentes = await _context.Residentes
-                                                .Include(r => r.Usuario) 
-                                                .ToListAsync();
+                IQueryable<Residente> query = _context.Residentes
+                                                        .Include(r => r.Usuario); 
+
+                // Aplicar filtros si se proporcionan
+                if (!string.IsNullOrWhiteSpace(nombre))
+                {
+                    query = query.Where(r => r.Nombre.Contains(nombre));
+                }
+                if (!string.IsNullOrWhiteSpace(apellidos))
+                {
+                    query = query.Where(r => r.Apellidos.Contains(apellidos));
+                }
+                if (!string.IsNullOrWhiteSpace(domicilio))
+                {
+                    query = query.Where(r => r.Domicilio != null && r.Domicilio.Contains(domicilio));
+                }
+
+                var residentes = await query.ToListAsync();
 
                 if (!residentes.Any())
                 {
-                    return NotFound("No se encontraron residentes.");
+                    return NotFound("No se encontraron residentes con los filtros especificados.");
                 }
 
                 var response = residentes.Select(r => new ResidentResponse
@@ -44,7 +65,7 @@ namespace ControlAccesos.WebApi.Controllers
                     Vehiculo = r.Vehiculo,
                     Placas = r.Placas,
                     UserId = r.UserId,
-                    Username = r.Usuario?.Username 
+                    Username = r.Usuario?.Username
                 }).ToList();
 
                 return Ok(response);
@@ -59,6 +80,8 @@ namespace ControlAccesos.WebApi.Controllers
             }
         }
 
+
+        // GET: api/Residentes/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetResidentById(int id)
         {
@@ -99,8 +122,6 @@ namespace ControlAccesos.WebApi.Controllers
         }
 
         // PUT: api/Residentes/{id}
-        // Solo Administradores pueden actualizar residentes.
-        // Este método sí permite actualizar el UserId para vincular/desvincular un residente a un usuario.
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateResident(int id, [FromBody] ResidentRequest request)
         {
@@ -139,7 +160,7 @@ namespace ControlAccesos.WebApi.Controllers
                     Telefono = residenteToUpdate.Telefono,
                     Vehiculo = residenteToUpdate.Vehiculo,
                     Placas = residenteToUpdate.Placas,
-                    UserId = residenteToUpdate.UserId, // Se mantiene el UserId existente
+                    UserId = residenteToUpdate.UserId, 
                     Username = username
                 });
             }
@@ -153,7 +174,8 @@ namespace ControlAccesos.WebApi.Controllers
             }
         }
 
-        
+
+        // PUT: Delete/Residentes/{id}
         [HttpDelete("{id}")]
         [Authorize(Roles = "Guardia")]
         public async Task<IActionResult> DeleteResident(int id)
