@@ -97,7 +97,8 @@ namespace ControlAccesos.WebApi.Controllers
                     TipoInvitacion = newInvitado.TipoInvitacion,
                     FechaValidez = newInvitado.FechaValidez,
                     QrCode = newInvitado.QrCode, 
-                    ResidenteId = newInvitado.ResidenteId
+                    ResidenteId = newInvitado.ResidenteId,
+                    EstadoQr = "Activo"
                 });
             }
             catch (DbException ex)
@@ -129,6 +130,14 @@ namespace ControlAccesos.WebApi.Controllers
                 if (invitado == null)
                 {
                     return NotFound("Código QR inválido o no encontrado.");
+                }
+
+                DateTime canceladoSentinel = DateTime.MinValue; // 0001-01-01T00:00:00
+
+                // Verificar si está cancelado
+                if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value == canceladoSentinel)
+                {
+                    return BadRequest("Permiso cancelado: Este código QR ha sido anulado.");
                 }
 
                 // Validar la fecha de validez (si aplica)
@@ -203,7 +212,8 @@ namespace ControlAccesos.WebApi.Controllers
                     TipoInvitacion = i.TipoInvitacion,
                     FechaValidez = i.FechaValidez,
                     QrCode = i.QrCode,
-                    ResidenteId = i.ResidenteId
+                    ResidenteId = i.ResidenteId,
+                    EstadoQr = GetQrStatus(i)
                 }).ToList();
 
                 return Ok(response);
@@ -218,5 +228,53 @@ namespace ControlAccesos.WebApi.Controllers
             }
         }
 
+        [HttpPut("cancel/{id}")]
+        [Authorize(Roles = "Residente")]
+        public async Task<IActionResult> CancelInvitation(int id)
+        {
+            var invitado = await _context.Invitados.FindAsync(id);
+            if (invitado == null) return NotFound("Invitación no encontrada.");
+
+
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdClaim.Value, out int userId)) return Unauthorized();
+            var residente = await _context.Residentes.FirstOrDefaultAsync(r => r.UserId == userId);
+            if (residente == null || invitado.ResidenteId != residente.Id) return Forbid();
+
+            // Establecer la fecha de validez a DateTime.MinValue para marcar como cancelado
+            invitado.FechaValidez = DateTime.MinValue;
+            _context.Entry(invitado).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return Ok("Invitación cancelada con éxito.");
+        }
+
+
+        private string GetQrStatus(Invitado invitado)
+        {
+            // 1. Verificar si está vencido
+            if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value < DateTime.Now)
+            {
+                return "Vencido";
+            }
+
+            // 2. Verificar si ya fue usado (solo para tipo "Unica")
+            if (invitado.TipoInvitacion == "Unica" &&
+                invitado.RegistrosAcceso != null &&
+                invitado.RegistrosAcceso.Any(ra => ra.TipoAcceso == "Entrada"))
+            {
+                return "Usado";
+            }
+
+
+            // 3. Verificar si está cancelado 
+            DateTime canceladoSentinel = DateTime.MinValue;
+            if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value == canceladoSentinel)
+            {
+                return "Cancelado";
+            }
+            
+            return "Activo";
+        }
     }
 }

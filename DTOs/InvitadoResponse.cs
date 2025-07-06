@@ -9,5 +9,6 @@
         public DateTime? FechaValidez { get; set; }
         public string QrCode { get; set; } 
         public int ResidenteId { get; set; }
+        public string EstadoQr { get; set; }
     }
 }
