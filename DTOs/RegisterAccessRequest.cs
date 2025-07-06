@@ -1,9 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
+
 namespace ControlAccesos.WebApi.DTOs
 {
-    public class RegisterAccessRequest
-    {
         public class RegisterAccessRequest : IValidatableObject 
         {
             [StringLength(10, ErrorMessage = "El código QR del invitado no puede exceder los 10 caracteres.")]
@@ -42,5 +41,5 @@ namespace ControlAccesos.WebApi.DTOs
                 
             }
         }
-    }
+    
 }

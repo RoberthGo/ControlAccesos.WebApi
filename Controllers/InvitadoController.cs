@@ -61,12 +61,7 @@ namespace ControlAccesos.WebApi.Controllers
                 return BadRequest("El usuario autenticado no está asociado a un residente válido.");
             }
 
-            int actualResidenteId = residente.Id;
-            // Asegurarse de que un residente no intente especificar un ResidenteId diferente
-            if (request.ResidenteId.HasValue && request.ResidenteId.Value != actualResidenteId)
-            {
-                return Forbid("Un residente solo puede crear invitados para sí mismo.");
-            }
+            int actualResidenteId = residente.Id;    
 
             try
             {

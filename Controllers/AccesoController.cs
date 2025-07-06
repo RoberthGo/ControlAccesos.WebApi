@@ -4,6 +4,7 @@ using ControlAccesos.WebApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
 using System.Security.Claims;
 
@@ -154,8 +155,92 @@ namespace ControlAccesos.WebApi.Controllers
             }
         }
 
+        // Método para obtener todos los registros de acceso
+        [HttpGet("history")]
+        public async Task<IActionResult> GetAccessHistory([FromQuery] AccessHistoryRequest request)
+        {
+            try
+            {
+                IQueryable<RegistroAcceso> query = _context.RegistrosAcceso
+                    .Include(ra => ra.Residente)
+                    .Include(ra => ra.Invitado)
+                        .ThenInclude(i => i.Residente) // Incluir el residente que invitó al invitado
+                    .Include(ra => ra.Guardia);
 
+                // Aplicar filtros
+                if (request.FechaInicio.HasValue)
+                {
+                    query = query.Where(ra => ra.FechaHora >= request.FechaInicio.Value);
+                }
+                if (request.FechaFin.HasValue)
+                {
+                    query = query.Where(ra => ra.FechaHora <= request.FechaFin.Value);
+                }
+                if (request.ResidenteId.HasValue)
+                {
+                    query = query.Where(ra => ra.ResidenteId == request.ResidenteId.Value);
+                }
+                if (request.InvitadoId.HasValue)
+                {
+                    query = query.Where(ra => ra.InvitadoId == request.InvitadoId.Value);
+                }
+                if (!string.IsNullOrWhiteSpace(request.TipoAcceso))
+                {
+                    query = query.Where(ra => ra.TipoAcceso == request.TipoAcceso);
+                }
+                if (request.GuardiaId.HasValue)
+                {
+                    query = query.Where(ra => ra.GuardiaId == request.GuardiaId.Value);
+                }
+                if (!string.IsNullOrWhiteSpace(request.PlacasVehiculo))
+                {
+                    query = query.Where(ra => ra.PlacasVehiculo == request.PlacasVehiculo);
+                }
 
+                // Ordenar por fecha y hora descendente por defecto
+                query = query.OrderByDescending(ra => ra.FechaHora);
+
+                var records = await query.ToListAsync();
+
+                if (!records.Any())
+                {
+                    return NotFound("No se encontraron registros de acceso con los filtros especificados.");
+                }
+
+                // Mapear a DTOs de respuesta
+                var accessHistory = records.Select(ra => new AccessRecordDto
+                {
+                    Id = ra.Id,
+                    FechaHora = ra.FechaHora,
+                    TipoAcceso = ra.TipoAcceso,
+                    NombreResidente = ra.Residente?.Nombre,
+                    ApellidosResidente = ra.Residente?.Apellidos,
+                    DomicilioResidente = ra.Residente?.Domicilio, // Añadir más campos si son útiles
+                    NombreInvitado = ra.Invitado?.Nombre,
+                    ApellidosInvitado = ra.Invitado?.Apellidos,
+                    TipoInvitacionInvitado = ra.Invitado?.TipoInvitacion, // Añadir más campos si son útiles
+                    NombreGuardia = ra.Guardia?.Nombre,
+                    ApellidosGuardia = ra.Guardia?.Apellidos,
+                    PlacasVehiculo = ra.PlacasVehiculo,
+                    Notas = ra.Notas
+                }).ToList();
+
+                return Ok(accessHistory);
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error al consultar el historial de acceso en la base de datos: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al obtener el historial de acceso: {ex.Message}");
+            }
+        }
     }
 
+
+
+
 }
+
+
