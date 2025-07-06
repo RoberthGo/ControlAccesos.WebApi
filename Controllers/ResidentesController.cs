@@ -20,8 +20,6 @@ namespace ControlAccesos.WebApi.Controllers
             _context = context;
         }
 
-
-
         // GET: api/Residentes/getAllBy
         [HttpGet("getAllBy")]
         public async Task<IActionResult> GetAllBy( 
@@ -120,6 +118,8 @@ namespace ControlAccesos.WebApi.Controllers
                 return StatusCode(500, $"Ocurrió un error inesperado al obtener el residente: {ex.Message}");
             }
         }
+
+
 
         // PUT: api/Residentes/{id}
         [HttpPut("{id}")]

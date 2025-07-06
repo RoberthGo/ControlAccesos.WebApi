@@ -133,13 +133,12 @@ namespace ControlAccesos.WebApi.Controllers
                 }
 
                 DateTime canceladoSentinel = DateTime.MinValue; // 0001-01-01T00:00:00
-
                 // Verificar si está cancelado
                 if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value == canceladoSentinel)
                 {
                     return BadRequest("Permiso cancelado: Este código QR ha sido anulado.");
                 }
-
+                
                 // Validar la fecha de validez (si aplica)
                 if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value < DateTime.Now)
                 {
@@ -228,50 +227,253 @@ namespace ControlAccesos.WebApi.Controllers
             }
         }
 
-        [HttpPut("cancel/{id}")]
-        [Authorize(Roles = "Residente")]
+
+        [HttpPut("{id}")] 
+        [Authorize(Roles = "Residente")] // Solo el residente que la creó puede actualizarla
+        public async Task<IActionResult> UpdateInvitado(int id, [FromBody] UpdateInvitadoRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Obtener el UserId del residente autenticado
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized("No se pudo identificar al usuario Residente autenticado.");
+            }
+
+            // Buscar el ResidenteId asociado al UserId autenticado
+            var residente = await _context.Residentes.FirstOrDefaultAsync(r => r.UserId == userId);
+            if (residente == null)
+            {
+                return BadRequest("El usuario autenticado no está asociado a un residente válido.");
+            }
+
+            // Buscar la invitación por ID y asegurarse de que pertenezca a este residente
+            var invitadoToUpdate = await _context.Invitados
+                                                 .Include(i => i.RegistrosAcceso) // Incluir registros para validación
+                                                 .FirstOrDefaultAsync(i => i.Id == id && i.ResidenteId == residente.Id);
+            if (invitadoToUpdate == null)
+            {
+                return NotFound("Invitación no encontrada o no pertenece a este residente.");
+            }
+
+            // Validaciones para no actualizar si ya está en un estado final o no modificable
+            DateTime canceladoSentinel = DateTime.MinValue;
+
+            if (invitadoToUpdate.FechaValidez.HasValue && invitadoToUpdate.FechaValidez.Value == canceladoSentinel)
+            {
+                return BadRequest("No se puede actualizar una invitación que ya está cancelada.");
+            }
+            if (invitadoToUpdate.FechaValidez.HasValue && invitadoToUpdate.FechaValidez.Value < DateTime.Now)
+            {
+                return BadRequest("No se puede actualizar una invitación que ya ha vencido.");
+            }
+            if (invitadoToUpdate.RegistrosAcceso.Any())
+            {
+                return BadRequest("No se puede actualizar una invitación que ya ha sido usada.");
+            }
+
+            try
+            {
+                // Aplicar solo los campos que se proporcionan en el request
+                if (!string.IsNullOrWhiteSpace(request.Nombre))
+                {
+                    invitadoToUpdate.Nombre = request.Nombre;
+                }
+                if (!string.IsNullOrWhiteSpace(request.Apellidos))
+                {
+                    invitadoToUpdate.Apellidos = request.Apellidos;
+                }
+                if (!string.IsNullOrWhiteSpace(request.TipoInvitacion))
+                {
+                    // Opcional: Validar que TipoInvitacion sea un ENUM válido ("Unica", "Recurrente", "PorFecha")
+                    if (request.TipoInvitacion != "Unica" && request.TipoInvitacion != "Recurrente" && request.TipoInvitacion != "PorFecha")
+                    {
+                        return BadRequest("Tipo de invitación inválido. Valores permitidos: 'Unica', 'Recurrente', 'PorFecha'.");
+                    }
+                    invitadoToUpdate.TipoInvitacion = request.TipoInvitacion;
+                }
+                if (request.FechaValidez.HasValue)
+                {
+                    invitadoToUpdate.FechaValidez = request.FechaValidez;
+                }
+
+                _context.Entry(invitadoToUpdate).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                // Devolver la invitación actualizada
+                return Ok(new InvitadoResponse
+                {
+                    Id = invitadoToUpdate.Id,
+                    Nombre = invitadoToUpdate.Nombre,
+                    Apellidos = invitadoToUpdate.Apellidos,
+                    TipoInvitacion = invitadoToUpdate.TipoInvitacion,
+                    FechaValidez = invitadoToUpdate.FechaValidez,
+                    QrCode = invitadoToUpdate.QrCode,
+                    ResidenteId = invitadoToUpdate.ResidenteId,
+                    EstadoQr = GetQrStatus(invitadoToUpdate)       
+                }); 
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error al actualizar la invitación en la base de datos: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al actualizar la invitación: {ex.Message}");
+            }
+        }
+
+
+        [HttpPut("cancel/{id}")] 
+        [Authorize(Roles = "Residente")] // Solo el residente que la creó puede cancelarla
         public async Task<IActionResult> CancelInvitation(int id)
         {
-            var invitado = await _context.Invitados.FindAsync(id);
-            if (invitado == null) return NotFound("Invitación no encontrada.");
-
-
+            // Obtener el UserId del residente autenticado
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim.Value, out int userId)) return Unauthorized();
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized("No se pudo identificar al usuario Residente autenticado.");
+            }
+
+            // Buscar el ResidenteId asociado al UserId autenticado
             var residente = await _context.Residentes.FirstOrDefaultAsync(r => r.UserId == userId);
-            if (residente == null || invitado.ResidenteId != residente.Id) return Forbid();
+            if (residente == null)
+            {
+                return BadRequest("El usuario autenticado no está asociado a un residente válido.");
+            }
 
-            // Establecer la fecha de validez a DateTime.MinValue para marcar como cancelado
-            invitado.FechaValidez = DateTime.MinValue;
-            _context.Entry(invitado).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            // Buscar la invitación por ID y asegurarse de que pertenezca a este residente
+            var invitadoToCancel = await _context.Invitados.FirstOrDefaultAsync(i => i.Id == id && i.ResidenteId == residente.Id);
+            if (invitadoToCancel == null)
+            {
+                return NotFound("Invitación no encontrada o no pertenece a este residente.");
+            }
 
-            return Ok("Invitación cancelada con éxito.");
+            DateTime canceladoSentinel = DateTime.MinValue;
+
+            // Validaciones para no cancelar si ya está en un estado final
+            if (invitadoToCancel.FechaValidez.HasValue && invitadoToCancel.FechaValidez.Value == canceladoSentinel)
+            {
+                return BadRequest("La invitación ya está cancelada.");
+            }
+            if (invitadoToCancel.FechaValidez.HasValue && invitadoToCancel.FechaValidez.Value < DateTime.Now)
+            {
+                return BadRequest("La invitación ya está vencida y no puede ser cancelada.");
+            }
+
+            // Cargar RegistrosAcceso para la validación de "Usado"
+            await _context.Entry(invitadoToCancel).Collection(i => i.RegistrosAcceso).LoadAsync();
+            if (invitadoToCancel.TipoInvitacion == "Unica" && invitadoToCancel.RegistrosAcceso != null && invitadoToCancel.RegistrosAcceso.Any(ra => ra.TipoAcceso == "Entrada"))
+            {
+                return BadRequest("La invitación ya ha sido usada y no puede ser cancelada.");
+            }
+
+            try
+            {
+                invitadoToCancel.FechaValidez = canceladoSentinel;
+                _context.Entry(invitadoToCancel).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return Ok("Invitación cancelada con éxito.");
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error al cancelar la invitación en la base de datos: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al cancelar la invitación: {ex.Message}");
+            }
         }
+
+
+
+        [HttpDelete("{id}")] 
+        [Authorize(Roles = "Residente")] // Solo el residente que la creó puede eliminarla
+        public async Task<IActionResult> DeleteInvitation(int id) 
+        {
+            // Obtener el UserId del residente autenticado
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized("No se pudo identificar al usuario Residente autenticado.");
+            }
+
+            // Buscar el ResidenteId asociado al UserId autenticado
+            var residente = await _context.Residentes.FirstOrDefaultAsync(r => r.UserId == userId);
+            if (residente == null)
+            {
+                return BadRequest("El usuario autenticado no está asociado a un residente válido.");
+            }
+
+            // Buscar la invitación por ID y asegurarse de que pertenezca a este residente
+            var invitadoToDelete = await _context.Invitados.FirstOrDefaultAsync(i => i.Id == id && i.ResidenteId == residente.Id);
+            if (invitadoToDelete == null)
+            {
+                return NotFound("Invitación no encontrada o no pertenece a este residente.");
+            }
+
+            
+            // No se podra eliminar la invitacion si ya fue usada o vencida
+            DateTime canceladoSentinel = DateTime.MinValue;
+
+            if (invitadoToDelete.FechaValidez.HasValue && invitadoToDelete.FechaValidez.Value < DateTime.Now && invitadoToDelete.FechaValidez.Value != canceladoSentinel)
+            {
+                return BadRequest("No se puede eliminar una invitación que ya ha vencido.");
+            }
+
+            if (invitadoToDelete.RegistrosAcceso.Any())
+            {
+                return BadRequest("No se puede eliminar una invitación que ya ha sido usada o ha generado registros de acceso.");
+            }
+
+            try
+            {
+                _context.Invitados.Remove(invitadoToDelete);
+                await _context.SaveChangesAsync(); 
+
+                return Ok($"Invitación con ID {id} eliminada con éxito.");
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error al eliminar la invitación en la base de datos: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al eliminar la invitación: {ex.Message}");
+            }
+        }
+
+
 
 
         private string GetQrStatus(Invitado invitado)
         {
-            // 1. Verificar si está vencido
+
+            DateTime canceladoSentinel = DateTime.MinValue;
+
+            // 1. Verificar si está cancelado
+            if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value == canceladoSentinel)
+            {
+                return "Cancelado";
+            }
+
+            // 2. Verificar si está vencido
             if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value < DateTime.Now)
             {
                 return "Vencido";
             }
 
-            // 2. Verificar si ya fue usado (solo para tipo "Unica")
+            // 3. Verificar si ya fue usado (solo para tipo "Unica")
             if (invitado.TipoInvitacion == "Unica" &&
                 invitado.RegistrosAcceso != null &&
                 invitado.RegistrosAcceso.Any(ra => ra.TipoAcceso == "Entrada"))
             {
                 return "Usado";
-            }
-
-
-            // 3. Verificar si está cancelado 
-            DateTime canceladoSentinel = DateTime.MinValue;
-            if (invitado.FechaValidez.HasValue && invitado.FechaValidez.Value == canceladoSentinel)
-            {
-                return "Cancelado";
             }
             
             return "Activo";

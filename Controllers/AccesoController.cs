@@ -52,7 +52,6 @@ namespace ControlAccesos.WebApi.Controllers
             string rolPersona = "Desconocido";
             string identificadorUsado = ""; // Para la respuesta
 
-            // Lógica de identificación:
             // Se asegura que solo uno de los campos de identificación sea proporcionado
             // gracias a la validación personalizada en RegisterAccessRequest.
 
@@ -242,10 +241,80 @@ namespace ControlAccesos.WebApi.Controllers
                 return StatusCode(500, $"Ocurrió un error inesperado al obtener el historial de acceso: {ex.Message}");
             }
         }
+
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateRegistroAcceso(int id, [FromBody] UpdateRegistroAccesoRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var registroToUpdate = await _context.RegistrosAcceso.FindAsync(id);
+
+                if (registroToUpdate == null)
+                {
+                    return NotFound($"Registro de acceso con ID {id} no encontrado.");
+                }
+
+                // Aplicar solo los campos que se proporcionan en el request
+                if (!string.IsNullOrWhiteSpace(request.PlacasVehiculo))
+                {
+                    registroToUpdate.PlacasVehiculo = request.PlacasVehiculo;
+                }
+                if (!string.IsNullOrWhiteSpace(request.Notas))
+                {
+                    registroToUpdate.Notas = request.Notas;
+                }
+                // Otros campos (FechaHora, TipoAcceso, IDs de personas) no se modifican para mantener la auditoría.
+
+                _context.Entry(registroToUpdate).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return Ok($"Registro de acceso con ID {id} actualizado con éxito.");
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error al actualizar el registro de acceso en la base de datos: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al actualizar el registro de acceso: {ex.Message}");
+            }
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteRegistroAcceso(int id)
+        {
+            try
+            {
+                var registroToDelete = await _context.RegistrosAcceso.FindAsync(id);
+
+                if (registroToDelete == null)
+                {
+                    return NotFound($"Registro de acceso con ID {id} no encontrado.");
+                }
+
+                _context.RegistrosAcceso.Remove(registroToDelete);
+                await _context.SaveChangesAsync();
+
+                return Ok($"Registro de acceso con ID {id} eliminado con éxito.");
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error al eliminar el registro de acceso de la base de datos: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al eliminar el registro de acceso: {ex.Message}");
+            }
+        }
+
+
     }
-
-
-
 
 }
 

@@ -31,7 +31,7 @@ namespace ControlAccesos.WebApi.Controllers
 
 
         [Authorize(Roles = "Guardia")]
-        [HttpPost("registerResident")]
+        [HttpPost("registerUser")]
         public async Task<IActionResult> Register([FromBody] UserRegisterRequest request)
         {
             // Validar el modelo (incluyendo la validación condicional de IValidatableObject)
