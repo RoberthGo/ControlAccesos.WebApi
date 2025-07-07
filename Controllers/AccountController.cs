@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Security.Claims;
 using System.Text;
 
@@ -45,7 +46,18 @@ namespace ControlAccesos.WebApi.Controllers
                 // 1. Verificar si el nombre de usuario ya existe
                 if (await _context.Usuarios.AnyAsync(u => u.Username == request.Username))
                 {
-                    return Conflict("El nombre de usuario ya existe.");
+                    var problemDetails = new ProblemDetails
+                    {
+                        Type = "https://tuapi.com/errors/usuario-existente", // URI para este tipo de error
+                        Title = "Conflicto de Recurso",
+                        Status = (int)HttpStatusCode.Conflict, // 409
+                        Instance = HttpContext.Request.Path //  URI específico del recurso donde ocurrió el error
+                    };
+                    problemDetails.Extensions["errors"] = new Dictionary<string, string[]>
+                    {
+                        { "UserName", new string[] { "El nombre de usuario ya existe." } }
+                    };
+                    return Conflict(problemDetails);
                 }
                 
                 // 2. Hashear la contraseña de forma segura con BCrypt
@@ -97,11 +109,39 @@ namespace ControlAccesos.WebApi.Controllers
             catch (DbException ex)
             {
                 // Si ocurre un error en la BD después de guardar el usuario pero antes del residente/guardia
-                return StatusCode(500, $"Error al registrar el usuario en la base de datos: {ex.Message}");
+                var problemDetails = new ProblemDetails
+                {
+                    Type = "https://tuapi.com/errors/database-error",
+                    Title = "Error de Base de Datos",
+                    Detail = $"Ocurrió un error al crear el residente/guardia: {ex.Message}",
+                    Status = (int)HttpStatusCode.InternalServerError, // 500
+                    Instance = HttpContext.Request.Path
+                };
+
+                // Puedes añadir información adicional si es útil para el cliente
+                problemDetails.Extensions["codigoErrorInterno"] = ex.ErrorCode; // Si el DbException lo expone
+                problemDetails.Extensions["tipoExcepcion"] = nameof(DbException);
+
+                // Devuelve el JSON de ProblemDetails con el código 500
+                return StatusCode((int)HttpStatusCode.InternalServerError, problemDetails);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Ocurrió un error inesperado al registrar el usuario: {ex.Message}");
+                var problemDetails = new ProblemDetails
+                {
+                    Type = "https://tuapi.com/errors/unhandled-exception",
+                    Title = "Error Interno del Servidor",
+                    Detail = "Ocurrió un error inesperado. Por favor, inténtelo de nuevo más tarde.",
+                    Status = (int)HttpStatusCode.InternalServerError, // 500
+                    Instance = HttpContext.Request.Path
+                };
+
+                problemDetails.Extensions["mensajeTecnico"] = ex.Message;
+                problemDetails.Extensions["stackTrace"] = ex.StackTrace;
+                problemDetails.Extensions["tipoExcepcion"] = nameof(Exception);
+
+                // Devuelve el JSON de ProblemDetails con el código 500
+                return StatusCode((int)HttpStatusCode.InternalServerError, problemDetails);
             }
         }
 
