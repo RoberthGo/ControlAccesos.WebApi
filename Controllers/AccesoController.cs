@@ -62,7 +62,7 @@ namespace ControlAccesos.WebApi.Controllers
                                              .Include(i => i.Residente) // Incluir información del residente que invita
                                              .FirstOrDefaultAsync(i => i.QrCode == request.InvitadoQrCode);
 
-                if (invitado != null)
+                if (invitado == null)
                 {
                     return NotFound("Código QR de invitado inválido o no encontrado.");
                 }
