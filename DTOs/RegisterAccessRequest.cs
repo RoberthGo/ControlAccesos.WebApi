@@ -24,22 +24,15 @@ namespace ControlAccesos.WebApi.DTOs
             // Validación personalizada para asegurar que exactamente un identificador sea proporcionado
             public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
             {
-                int identifiersProvided = 0;
-                if (!string.IsNullOrWhiteSpace(InvitadoQrCode)) identifiersProvided++;
-                if (!string.IsNullOrWhiteSpace(ResidentUsername)) identifiersProvided++;
-
-                if (identifiersProvided == 0)
+                
+                if (string.IsNullOrWhiteSpace(ResidentUsername) == string.IsNullOrWhiteSpace(InvitadoQrCode) )
                 {
                     yield return new ValidationResult(
                         "Se debe proporcionar exactamente un método de identificación: 'InvitadoQrCode' o 'ResidentUsername'.",
                         new[] { nameof(InvitadoQrCode), nameof(ResidentUsername) });
                 }
-                
-                yield return new ValidationResult(
-                    "Solo se debe proporcionar un método de identificación: 'InvitadoQrCode' o 'ResidentUsername'.",
-                    new[] { nameof(InvitadoQrCode), nameof(ResidentUsername)});
-                
-            }
+
         }
+    }
     
 }

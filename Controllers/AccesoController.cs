@@ -162,7 +162,7 @@ namespace ControlAccesos.WebApi.Controllers
 
         // Método para obtener todos los registros de acceso
         [HttpGet("history")]
-        public async Task<IActionResult> GetAccessHistory([FromQuery] AccessHistoryRequest request)
+        public async Task<IActionResult> GetAccessHistory([FromBody] AccessHistoryRequest request)
         {
             try
             {
