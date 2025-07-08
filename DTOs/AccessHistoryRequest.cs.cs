@@ -9,5 +9,6 @@
         public string? TipoAcceso { get; set; }   // Opcional: "Entrada" o "Salida"
         public int? GuardiaId { get; set; }       // Opcional: Filtrar por ID de guardia
         public string? PlacasVehiculo { get; set; } // Opcional: Filtrar por placas de vehículo
+        public string? tipoDePersona { get; set; }
     }
 }

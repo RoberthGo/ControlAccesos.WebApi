@@ -203,6 +203,25 @@ namespace ControlAccesos.WebApi.Controllers
                     query = query.Where(ra => ra.PlacasVehiculo == request.PlacasVehiculo);
                 }
 
+                if (!string.IsNullOrWhiteSpace(request.tipoDePersona))
+                {
+                    string tipoNormalizado = request.tipoDePersona.Trim().ToLower(); // Normalizar a minúsculas para comparación
+
+                    if (tipoNormalizado == "residente")
+                    {
+                        query = query.Where(ra => ra.ResidenteId != null);
+                    }
+                    else if (tipoNormalizado == "invitado")
+                    {
+                        query = query.Where(ra => ra.InvitadoId != null);
+                    }
+                    else
+                    {
+                        // Si tipoDePersona no es "Residente" ni "Invitado", se considera un argumento inválido.
+                        return BadRequest("El valor para 'tipoDePersona' debe ser 'Residente' o 'Invitado'.");
+                    }
+                }
+
                 // Ordenar por fecha y hora descendente por defecto
                 query = query.OrderByDescending(ra => ra.FechaHora);
 
