@@ -196,6 +196,7 @@ namespace ControlAccesos.WebApi.Controllers
             {
                 var invitados = await _context.Invitados
                                               .Where(i => i.ResidenteId == residente.Id)
+                                              .Include(i => i.RegistrosAcceso)
                                               .ToListAsync();
 
                 if (!invitados.Any())
@@ -469,9 +470,7 @@ namespace ControlAccesos.WebApi.Controllers
             }
 
             // 3. Verificar si ya fue usado (solo para tipo "Unica")
-            if (invitado.TipoInvitacion == "Unica" &&
-                invitado.RegistrosAcceso != null &&
-                invitado.RegistrosAcceso.Any(ra => ra.TipoAcceso == "Entrada"))
+            if (invitado.TipoInvitacion == "Unica" &&  invitado.RegistrosAcceso.Any())
             {
                 return "Usado";
             }

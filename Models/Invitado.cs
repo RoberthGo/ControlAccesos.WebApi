@@ -28,7 +28,7 @@ namespace ControlAccesos.WebApi.Models
         [ForeignKey("ResidenteId")]
         public Residente Residente { get; set; } // Propiedad de navegación
 
-        public ICollection<RegistroAcceso> RegistrosAcceso { get; set; }
+        public ICollection<RegistroAcceso> RegistrosAcceso { get; set; } = new List<RegistroAcceso>();
     }
 
 }
