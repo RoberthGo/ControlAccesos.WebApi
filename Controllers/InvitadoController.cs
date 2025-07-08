@@ -146,12 +146,10 @@ namespace ControlAccesos.WebApi.Controllers
                 }
 
                 // Validar si es de tipo "Unica" y ya ha sido usado para entrada
-                var hasEntered = await _context.RegistrosAcceso
-                                               .AnyAsync(ra => ra.InvitadoId == invitado.Id && ra.TipoAcceso == "Entrada");
 
-                if (invitado.TipoInvitacion == "Unica" && hasEntered)
+                if (invitado.TipoInvitacion == "Unica" && invitado.RegistrosAcceso.Any() && invitado.RegistrosAcceso.Any(ra => ra.TipoAcceso == "Salida"))
                 {
-                    return BadRequest("Este código QR ya ha sido utilizado para una entrada.");
+                    return BadRequest("Este código QR ya ha sido utilizado.");
                 }
 
                 // Si todo es válido, devolver la información del invitado
@@ -271,10 +269,6 @@ namespace ControlAccesos.WebApi.Controllers
             if (invitadoToUpdate.FechaValidez.HasValue && invitadoToUpdate.FechaValidez.Value < DateTime.Now)
             {
                 return BadRequest("No se puede actualizar una invitación que ya ha vencido.");
-            }
-            if (invitadoToUpdate.RegistrosAcceso.Any())
-            {
-                return BadRequest("No se puede actualizar una invitación que ya ha sido usada.");
             }
 
             try

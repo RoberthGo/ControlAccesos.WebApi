@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Security.Claims;
 
 namespace ControlAccesos.WebApi.Controllers
@@ -60,6 +61,7 @@ namespace ControlAccesos.WebApi.Controllers
                 // 1. Intentar identificar como Invitado por QrCode
                 var invitado = await _context.Invitados
                                              .Include(i => i.Residente) // Incluir información del residente que invita
+                                             .Include(i => i.RegistrosAcceso)
                                              .FirstOrDefaultAsync(i => i.QrCode == request.InvitadoQrCode);
 
                 if (invitado == null)
@@ -81,13 +83,16 @@ namespace ControlAccesos.WebApi.Controllers
                     return BadRequest("Acceso denegado: El permiso del invitado ha expirado.");
                 }
 
-                // Validar tipo de invitación "Unica"
-                var hasEntered = await _context.RegistrosAcceso
-                                                .AnyAsync(ra => ra.InvitadoId == invitado.Id && ra.TipoAcceso == "Entrada");
+                /*
+                 
+                 TODONOHACER
+                 */
 
-                if (invitado.TipoInvitacion == "Unica" && hasEntered)
+
+                Debug.WriteLine(invitado.RegistrosAcceso.Any());
+                if (invitado.TipoInvitacion == "Unica" && invitado.RegistrosAcceso.Any() && invitado.RegistrosAcceso.Any(ra => ra.TipoAcceso == "Salida"))
                 {
-                    return BadRequest("Acceso denegado: Este código de invitado único ya ha sido utilizado para una entrada.");
+                    return BadRequest("Este código QR ya ha sido utilizado.");
                 }
 
                 invitadoId = invitado.Id;
