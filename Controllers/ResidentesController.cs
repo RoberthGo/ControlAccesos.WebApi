@@ -215,5 +215,50 @@ namespace ControlAccesos.WebApi.Controllers
             }
         }
 
+
+
+
+        [HttpGet("byUsername")]
+        public async Task<IActionResult> GetResidentIdByUsername([FromQuery] string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return BadRequest("El nombre de usuario no puede estar vacío.");
+            }
+
+            try
+            {
+                // Buscar el usuario por nombre de usuario
+                var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Username == username);
+
+                if (usuario == null)
+                {
+                    return NotFound($"Usuario '{username}' no encontrado.");
+                }
+
+                // Buscar el residente asociado a ese usuario
+                var residente = await _context.Residentes.FirstOrDefaultAsync(r => r.UserId == usuario.Id);
+
+                if (residente == null)
+                {
+                    return NotFound($"No se encontró un residente asociado al usuario '{username}'.");
+                }
+
+                // Devolver el ID del residente
+                return Ok(new ResidentIdByUsernameResponse
+                {
+                    ResidenteId = residente.Id,
+                    Username = usuario.Username
+                });
+            }
+            catch (DbException ex)
+            {
+                return StatusCode(500, $"Error de base de datos al buscar residente por nombre de usuario: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Ocurrió un error inesperado al buscar residente por nombre de usuario: {ex.Message}");
+            }
+        }
     }
 }
