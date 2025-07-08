@@ -12,7 +12,6 @@ namespace ControlAccesos.WebApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Guardia")] // Solo los Guardias pueden registrar accesos
     public class AccesoController : ControllerBase
     {
         private readonly ControlAccesosDbContext _context;
@@ -23,6 +22,7 @@ namespace ControlAccesos.WebApi.Controllers
         }
 
         [HttpPost("register")]
+        [Authorize(Roles = "Guardia")]
         public async Task<IActionResult> RegisterAccess([FromBody] RegisterAccessRequest request)
         {
             // Validar el modelo, incluyendo la validación personalizada para al menos un identificador
@@ -162,6 +162,7 @@ namespace ControlAccesos.WebApi.Controllers
 
         // Método para obtener todos los registros de acceso
         [HttpPost("history")]
+        [Authorize(Roles = "Guardia,Residente")]
         public async Task<IActionResult> GetAccessHistory([FromBody] AccessHistoryRequest request)
         {
             try
@@ -244,6 +245,7 @@ namespace ControlAccesos.WebApi.Controllers
 
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Guardia")]
         public async Task<IActionResult> UpdateRegistroAcceso(int id, [FromBody] UpdateRegistroAccesoRequest request)
         {
             if (!ModelState.IsValid)
@@ -287,6 +289,7 @@ namespace ControlAccesos.WebApi.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Guardia")]
         public async Task<IActionResult> DeleteRegistroAcceso(int id)
         {
             try
