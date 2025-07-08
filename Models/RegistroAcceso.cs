@@ -18,10 +18,10 @@ namespace ControlAccesos.WebApi.Models
         public int GuardiaId { get; set; } 
 
         [StringLength(20)]
-        public string PlacasVehiculo { get; set; }
+        public string? PlacasVehiculo { get; set; }
 
         [StringLength(500)]
-        public string Notas { get; set; }
+        public string? Notas { get; set; }
 
         [ForeignKey("ResidenteId")]
         public Residente Residente { get; set; }
